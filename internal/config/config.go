@@ -58,7 +58,7 @@ func Read() Config {
 	if err != nil {
 		log.Fatal("Could not unmarshal json data.")
 	}
-	fmt.Println("Successfully read config file.")
+	// fmt.Println("Successfully read config file.")
 	return config
 }
 

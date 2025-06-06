@@ -160,14 +160,9 @@ func handleAgg(s *state, _ command) error {
 	return nil
 }
 
-func handleAddfeed(s *state, cmd command) error {
+func handleAddfeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		return fmt.Errorf("ERROR: addfeed requires two arguments.\nUsage: gator addfeed <feedName> <url>")
-	}
-	user, err := s.db.GetUser(context.Background(), s.cfg.Username)
-	if err != nil {
-		fmt.Println("ERROR: Could not retrieve user information from database.")
-		return err
 	}
 	currentTime := time.Now()
 	arg := database.CreateFeedParams{}
@@ -180,6 +175,10 @@ func handleAddfeed(s *state, cmd command) error {
 	feed, err := s.db.CreateFeed(context.Background(), arg)
 	if err != nil {
 		fmt.Println("ERROR: Could not create feed.")
+		return err
+	}
+	_, err = addFollow(s, user.ID, feed.ID)
+	if err != nil {
 		return err
 	}
 	fmt.Printf("%v %v %v %v %v %v\n", feed.ID, feed.CreatedAt, feed.UpdatedAt, feed.Name, feed.Url, feed.UserID)
@@ -196,6 +195,66 @@ func handleFeeds(s *state, _ command) error {
 		fmt.Printf("%v %v %v\n", feed.Name, feed.Url, feed.UserName)
 	}
 	return nil
+}
+
+func addFollow(s *state, userID uuid.UUID, feedID uuid.UUID) (database.CreateFeedFollowRow, error) {
+	var arg database.CreateFeedFollowParams
+	arg.UserID = userID
+	arg.FeedID = feedID
+	currentTime := time.Now()
+	arg.CreatedAt = currentTime
+	arg.UpdatedAt = currentTime
+	arg.ID = uuid.New()
+	feed_follow, err := s.db.CreateFeedFollow(context.Background(), arg)
+	if err != nil {
+		fmt.Println("Could not add feed follow to database.")
+		return database.CreateFeedFollowRow{}, err
+	}
+	return feed_follow, nil
+}
+
+func handleFollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("ERROR: follow command requires one argument.\n Usage: gator follow <url>")
+	}
+	feedID, err := s.db.GetFeedIDByUrl(context.Background(), cmd.args[0])
+	if err != nil {
+		fmt.Println("Unable to retrieve feed from database.  This likely means the feed has not been added.\nTry adding with \"gator addfeed <feedname> <url>\"")
+		return err
+	}
+	feed_follow, err := addFollow(s, user.ID, feedID)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v %v\n", feed_follow.FeedName, feed_follow.UserName)
+	return nil
+}
+
+func handleFollowing(s *state, _ command, user database.User) error {
+	feeds, err := s.db.GetFeedFollowsForUser(context.Background(), user.Name)
+	if err != nil {
+		fmt.Printf("ERROR: Could not retrieve follows for user %v\n", user.Name)
+		return err
+	}
+	if len(feeds) < 1 {
+		fmt.Printf("No feeds followed by user %v\n", user.Name)
+		return nil
+	}
+	fmt.Printf("Feeds followed by user %v:\n", feeds[0].UserName)
+	for _, feed := range feeds {
+		fmt.Println(feed.FeedName)
+	}
+	return nil
+}
+
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.Username)
+		if err != nil {
+			return err
+		}
+		return handler(s, cmd, user)
+	}
 }
 
 func main() {
@@ -216,8 +275,10 @@ func main() {
 	cmds.register("reset", handlerReset)
 	cmds.register("users", handlerUsers)
 	cmds.register("agg", handleAgg)
-	cmds.register("addfeed", handleAddfeed)
+	cmds.register("addfeed", middlewareLoggedIn(handleAddfeed))
 	cmds.register("feeds", handleFeeds)
+	cmds.register("follow", middlewareLoggedIn(handleFollow))
+	cmds.register("following", middlewareLoggedIn(handleFollowing))
 	argv := os.Args
 	if len(argv) < 2 {
 		fmt.Println("Not enough arguemnts provided.")
