@@ -8,13 +8,13 @@ Made with Go 1.24.3
 - Go
 - PostgreSQL
 
-### Description
+## Description
 
 A CLI application that scrapes RSS Feeds for new posts.  Can support multiple users per database.
 
 You must have Postgres and Go to run the program.  All database queries were set up for Postgres.
 
-### Installation
+## Installation
 
 Option 1: Install from github
 
