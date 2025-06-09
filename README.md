@@ -19,15 +19,7 @@ You must have Postgres and Go to run the program.  All database queries were set
 
 ## Installation
 
-### Option 1:
-Install from github
-
-```console
-go install github.com/lucoand/gator@latest
-```
-
-### Option 2:
-Download and build
+### Download and build
 
 ```console
 git clone https://github.com/lucoand/gator.git
@@ -43,6 +35,7 @@ go build
 ```console
 go install
 ```
+Installing will put the `gator` executable in your path, which will make it easier to run.
 
 ## Configuration
 
@@ -113,3 +106,59 @@ For example:
 ```console
 "postgres://postgres:yourpasshere@localhost:5432/gator"
 ```
+
+You can verify your string by running psql, for example:
+
+```console
+psql "postgres://postgres:yourpasshere@localhost:5432/gator"
+```
+
+It should connect you to the `gator` database directly.
+
+Armed with this working string, we can finally set up the database with goose.
+
+From the root directory of the repo:
+```console
+cd sql/schema
+goose postgres <connectionstring> up
+```
+Example:
+```console
+goose postgres "postgres://postgres:password@localhost:5432/gator" up
+```
+
+This will use the schema files to update the database with the tables `gator` requires.
+
+### Step 3:
+Create Config File
+
+This is the final step!
+
+Create a file called .gatorconfig.json in your HOME directory and populate it with this data:
+```json
+{
+    "db_url":"<connection_string>?sslmode=disable",
+    "current_user_name":""
+}
+```
+Example:
+
+```json
+{
+    "db_url":"postgres://postgres:password@localhost:5432/gator?sslmode=disable",
+    "current_user_name":""
+}
+```
+Make sure the quotation marks are there, even the empty quotes for `"current_user_name"`  If you like you can put a username into that field.
+
+Example:
+```json
+"current_user_name":"lucoa"
+```
+However this it not necessary.  `gator` will modify this file based on your input when you register or login to different users in in the database.
+
+That's it!  You're now ready to use `gator`!
+
+## Usage
+
+
