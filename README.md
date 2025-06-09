@@ -16,13 +16,15 @@ You must have Postgres and Go to run the program.  All database queries were set
 
 ## Installation
 
-Option 1: Install from github
+### Option 1:
+Install from github
 
 ```console
 go install github.com/lucoand/gator@latest
 ```
 
-Option 2: Download and build
+### Option 2:
+Download and build
 
 ```console
 git clone https://github.com/lucoand/gator.git
