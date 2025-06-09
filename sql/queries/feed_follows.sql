@@ -30,3 +30,17 @@ ON feeds.id = feed_follows.feed_id
 INNER JOIN users
 ON users.id = feed_follows.user_id
 WHERE users.name = $1;
+
+-- name: DeleteFeedFollowByUserNameAndFeedUrl :one
+-- @param user_name: string
+-- @param feed_url: string
+WITH deleted AS (
+DELETE FROM feed_follows
+USING users, feeds
+WHERE users.id = feed_follows.user_id
+AND feeds.id = feed_follows.feed_id
+AND users.name = sqlc.arg('user_name')
+AND feeds.url = sqlc.arg('feed_url')
+RETURNING 1
+)
+SELECT COUNT(*) FROM deleted;

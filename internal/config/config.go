@@ -40,7 +40,7 @@ func write(cfg Config) error {
 		fmt.Printf("ERROR: Unable to write file to %v\n", configFilePath)
 		return err
 	}
-	fmt.Println("Write config success")
+	// fmt.Println("Write config success")
 	return nil
 }
 
@@ -68,6 +68,6 @@ func SetUser(current_user_name string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Successfully set username")
+	fmt.Printf("Logged in as %v\n", cfg.Username)
 	return nil
 }

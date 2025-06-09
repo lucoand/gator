@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"database/sql"
 	"encoding/xml"
@@ -10,10 +11,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/araddon/dateparse"
+
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/lucoand/gator/internal/config"
 	"github.com/lucoand/gator/internal/database"
 )
@@ -44,6 +49,7 @@ type RSSFeed struct {
 type RSSItem struct {
 	Title       string `xml:"title"`
 	Link        string `xml:"link"`
+	GUID        string `xml:"guid"`
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 }
@@ -77,12 +83,21 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	for i := range feed.Channel.Item {
 		feed.Channel.Item[i].Title = html.UnescapeString(feed.Channel.Item[i].Title)
 		feed.Channel.Item[i].Description = html.UnescapeString(feed.Channel.Item[i].Description)
+		if feed.Channel.Item[i].Link == "" && feed.Channel.Item[i].GUID != "" {
+			feed.Channel.Item[i].Link = feed.Channel.Item[i].GUID
+		}
+		// fmt.Println("TITLE:", feed.Channel.Item[i].Title)
+		// fmt.Println("LINK:", feed.Channel.Item[i].Link)
 	}
 	return &feed, nil
 }
 
 func (c *commands) run(s *state, cmd command) error {
-	err := c.funcs[cmd.name](s, cmd)
+	f, ok := c.funcs[cmd.name]
+	if !ok {
+		return fmt.Errorf("ERROR: Unknown command %v", cmd.name)
+	}
+	err := f(s, cmd)
 	return err
 }
 
@@ -118,19 +133,27 @@ func handlerRegister(s *state, cmd command) error {
 		fmt.Println("ERROR: Name already exists.")
 		return err
 	}
-	fmt.Printf("User %v was created.\n", args.Name)
-	fmt.Printf("%v %v %v %v\n", user.ID, user.CreatedAt, user.UpdatedAt, user.Name)
-	err = config.SetUser(args.Name, *s.cfg)
+	fmt.Printf("User %v was created.\n", user.Name)
+	// fmt.Printf("%v %v %v %v\n", user.ID, user.CreatedAt, user.UpdatedAt, user.Name)
+	err = config.SetUser(user.Name, *s.cfg)
 	return err
 }
 
 func handlerReset(s *state, _ command) error {
-	err := s.db.DeleteAllUsers(context.Background())
-	if err != nil {
-		fmt.Println("ERROR: Could not reset users table.")
-		return err
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("This will DELETE ALL data from the database, including user and feed data.  Are you sure? (yes/[no]): ")
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "yes" {
+		err := s.db.DeleteAllUsers(context.Background())
+		if err != nil {
+			fmt.Println("ERROR: Could not reset users table.")
+			return err
+		}
+		fmt.Println("Users table reset successfully.")
+	} else {
+		fmt.Println("Aborted.")
 	}
-	fmt.Println("Users table reset successfully.")
 	return nil
 }
 
@@ -150,14 +173,25 @@ func handlerUsers(s *state, _ command) error {
 	return nil
 }
 
-func handleAgg(s *state, _ command) error {
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+func handleAgg(s *state, cmd command) error {
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("ERROR: agg requires an argument.\nUsage: \"gator agg <interval>\".  Interval can be of a form like 1m, 1h, etc.  Must be at least 1m.")
+	}
+	const minInterval = 1 * time.Minute
+	timeBetweenRequests, err := time.ParseDuration(cmd.args[0])
 	if err != nil {
-		fmt.Println("Could not fetch feed.")
+		fmt.Printf("ERROR: Unable to parse duration \"%v\"\n", cmd.args[0])
 		return err
 	}
-	fmt.Printf("%v\n", feed)
-	return nil
+	if timeBetweenRequests < minInterval {
+		fmt.Printf("Interval too short!  Must be at least %v\n", minInterval)
+		return nil
+	}
+	fmt.Printf("Collecting feeds every %v\n", timeBetweenRequests)
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 }
 
 func handleAddfeed(s *state, cmd command, user database.User) error {
@@ -181,7 +215,9 @@ func handleAddfeed(s *state, cmd command, user database.User) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v %v %v %v %v %v\n", feed.ID, feed.CreatedAt, feed.UpdatedAt, feed.Name, feed.Url, feed.UserID)
+	// fmt.Printf("%v %v %v %v %v %v\n", feed.ID, feed.CreatedAt, feed.UpdatedAt, feed.Name, feed.Url, feed.UserID)
+	fmt.Printf("Added feed to database:\n")
+	fmt.Printf("%v\n", feed.Name)
 	return nil
 }
 
@@ -247,6 +283,129 @@ func handleFollowing(s *state, _ command, user database.User) error {
 	return nil
 }
 
+func handleUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("ERROR: unfollow requires a feed url\nUsage: gator unfollow <url>")
+	}
+	var arg database.DeleteFeedFollowByUserNameAndFeedUrlParams
+	arg.UserName = user.Name
+	arg.FeedUrl = cmd.args[0]
+	count, err := s.db.DeleteFeedFollowByUserNameAndFeedUrl(context.Background(), arg)
+	if err != nil {
+		fmt.Println("ERROR: Unable to delete follow.")
+		return err
+	}
+	if count < 1 {
+		fmt.Printf("User %v was already not following %v\n", arg.UserName, arg.FeedUrl)
+	} else {
+		fmt.Printf("%v unfollowed for user %v\n", arg.FeedUrl, arg.UserName)
+	}
+	return nil
+}
+
+func handleBrowse(s *state, cmd command, user database.User) error {
+	limit := 2
+	if len(cmd.args) > 0 {
+		arg, err := strconv.Atoi(cmd.args[0])
+		if err != nil {
+			fmt.Printf("ERROR: %v\n", err)
+			fmt.Println("Could not parse optional limit argument.\nUsage: gator browse [limit].  limit must be a decimal value.")
+			fmt.Println("Defaulting to limit= 2")
+		} else {
+			limit = arg
+		}
+	}
+
+	posts, err := s.db.GetPostsForUser(context.Background(), user.ID)
+	if err != nil {
+		fmt.Printf("ERROR: Could not get posts for user %v\n", user.Name)
+		return err
+	}
+	num_posts := len(posts)
+	if num_posts < limit {
+		fmt.Printf("Limit was %v but only found %v posts.\n", limit, num_posts)
+		limit = num_posts
+	}
+
+	fmt.Printf("Most recent %v posts for user %v\n\n", limit, user.Name)
+	for i := range limit {
+		// fmt.Printf("%v %v %v %v\n\n", posts[i].Title, posts[i].Url, posts[i].Description, posts[i].PublishedAt)
+		fmt.Println("TITLE:", posts[i].Title)
+		fmt.Println("URL:", posts[i].Url)
+		fmt.Println("DESCRIPTION:", posts[i].Description)
+		fmt.Println("PUBLISHED AT:", posts[i].PublishedAt)
+		fmt.Println("")
+	}
+	return nil
+}
+
+func scrapeFeeds(s *state) error {
+	feedRow, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		fmt.Println("ERROR: Could not retrieve feed data from database.")
+		return err
+	}
+	err = s.db.MarkFeedFetched(context.Background(), feedRow.ID)
+	if err != nil {
+		fmt.Println("ERROR: Unable to mark feed as fetched.")
+		return err
+	}
+	feed, err := fetchFeed(context.Background(), feedRow.Url)
+	if err != nil {
+		fmt.Printf("ERROR: Could not fetch feed from %v\n", feedRow.Url)
+		return err
+	}
+	fmt.Printf("Checking feed %v for new posts.\n\n", feed.Channel.Title)
+	count := 0
+	// fmt.Printf("Found %v posts.\n", len(feed.Channel.Item))
+	for _, item := range feed.Channel.Item {
+		published_at, err := dateparse.ParseAny(item.PubDate)
+		if err != nil {
+			fmt.Printf("ERROR: Could not parse PubDate for %v.\n", item.Link)
+		}
+		// fmt.Printf("%v\n", published_at)
+		var arg database.CreatePostParams
+		arg.ID = uuid.New()
+		arg.Title = item.Title
+		arg.Url = item.Link
+		arg.Description = item.Description
+		arg.PublishedAt = published_at
+		arg.FeedID = feedRow.ID
+		post, err := s.db.CreatePost(context.Background(), arg)
+		if err != nil {
+			// fmt.Println(item.Link)
+			err = checkPostError(err)
+			if err != nil {
+				return err
+			}
+
+		} else {
+			fmt.Printf("%v %v %v %v\n\n", post.Title, post.Url, post.Description, post.PublishedAt)
+			fmt.Println("TITLE:", post.Title)
+			fmt.Println("URL:", post.Url)
+			fmt.Println("DESCRIPTION:", post.Description)
+			fmt.Println("PUBLISHED AT:", post.PublishedAt)
+			fmt.Println("")
+			count += 1
+		}
+	}
+	if count == 0 {
+		fmt.Printf("No new posts found.\n\n")
+	} else {
+		fmt.Printf("Found %v new posts.\n\n", count)
+	}
+	return nil
+}
+
+func checkPostError(err error) error {
+	if pqErr, ok := err.(*pq.Error); ok {
+		if pqErr.Constraint == "posts_url_key" {
+			return nil
+		}
+	}
+	return err
+}
+
 func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
 	return func(s *state, cmd command) error {
 		user, err := s.db.GetUser(context.Background(), s.cfg.Username)
@@ -279,6 +438,8 @@ func main() {
 	cmds.register("feeds", handleFeeds)
 	cmds.register("follow", middlewareLoggedIn(handleFollow))
 	cmds.register("following", middlewareLoggedIn(handleFollowing))
+	cmds.register("unfollow", middlewareLoggedIn(handleUnfollow))
+	cmds.register("browse", middlewareLoggedIn(handleBrowse))
 	argv := os.Args
 	if len(argv) < 2 {
 		fmt.Println("Not enough arguemnts provided.")

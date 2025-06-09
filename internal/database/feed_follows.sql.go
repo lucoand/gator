@@ -74,6 +74,33 @@ func (q *Queries) CreateFeedFollow(ctx context.Context, arg CreateFeedFollowPara
 	return i, err
 }
 
+const deleteFeedFollowByUserNameAndFeedUrl = `-- name: DeleteFeedFollowByUserNameAndFeedUrl :one
+WITH deleted AS (
+DELETE FROM feed_follows
+USING users, feeds
+WHERE users.id = feed_follows.user_id
+AND feeds.id = feed_follows.feed_id
+AND users.name = $1
+AND feeds.url = $2
+RETURNING 1
+)
+SELECT COUNT(*) FROM deleted
+`
+
+type DeleteFeedFollowByUserNameAndFeedUrlParams struct {
+	UserName string
+	FeedUrl  string
+}
+
+// @param user_name: string
+// @param feed_url: string
+func (q *Queries) DeleteFeedFollowByUserNameAndFeedUrl(ctx context.Context, arg DeleteFeedFollowByUserNameAndFeedUrlParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, deleteFeedFollowByUserNameAndFeedUrl, arg.UserName, arg.FeedUrl)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getFeedFollowsForUser = `-- name: GetFeedFollowsForUser :many
 SELECT
 	feeds.name AS feed_name,
