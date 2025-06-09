@@ -97,14 +97,19 @@ Next, set up your connection string.  We will need this string both for database
 
 The string should be of this form:
 
+```console
 "postgres://username:password@host:port/database"
+```
 
 Default port for postgres is 5432.
 
 For example:
 
 #### macOS
+```console
 "postgres://username:@localhost:5432/gator"
-
+```
 #### Linux
+```console
 "postgres://postgres:yourpasshere@localhost:5432/gator"
+```
