@@ -14,7 +14,7 @@ A CLI application that scrapes RSS Feeds for new posts.  Can support multiple us
 
 You must have Postgres and Go to run the program.  All database queries were set up for Postgres.
 
-#### Installation
+### Installation
 
 Option 1: Install from github
 
@@ -38,3 +38,4 @@ go build
 ```console
 go install
 ```
+
