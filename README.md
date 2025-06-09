@@ -20,8 +20,21 @@ Option 1: Install from github
 
 ```console
 go install github.com/lucoand/gator@latest
-``````
-
-
 ```
+
+Option 2: Download and build
+
+```console
+git clone https://github.com/lucoand/gator.git
+cd gator
+```
+
+From here, you can do either build or install:
+
+```console
+go build
+```
+
+```console
+go install
 ```
