@@ -416,6 +416,25 @@ func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) 
 	}
 }
 
+func handleHelp(_ *state, _ command) error {
+	fmt.Println("Gator - RSS Feed Aggregator")
+	fmt.Printf("See the README for more detailed usage examples.\n\n")
+	fmt.Println("Commands:")
+	fmt.Println("gator help: Displays this help message.")
+	fmt.Println("gator register <username>: registers <username> in the database and logs the user in.")
+	fmt.Println("gator login <username>: logs the user in if they are already registered.")
+	fmt.Println("gator users: lists all users.")
+	fmt.Println("gator addfeed <feed_name> <url>: adds the feed to the database and follows it for the logged in user.")
+	fmt.Println("gator feeds: lists all feeds in the database.")
+	fmt.Println("gator follow <url>: follows a feed already in the database.")
+	fmt.Println("gator following: lists all feeds followed by the logged in user.")
+	fmt.Println("gator unfollow <url>: unfollows the feed for the logged in user.")
+	fmt.Println("gator agg <interval>: Fetches posts from the feeds added with addfeed and stores them in the database.")
+	fmt.Println("gator browse [limit]: Optional limit value, defaults to 2. Lists [limit] number of posts from the logged in user's feeds, newest first.")
+	fmt.Println("gator reset: WARNING Deletes ALL data from the database after 'yes' confirmation. Use with caution.")
+	return nil
+}
+
 func main() {
 	cfg := config.Read()
 	var s state
@@ -440,6 +459,7 @@ func main() {
 	cmds.register("following", middlewareLoggedIn(handleFollowing))
 	cmds.register("unfollow", middlewareLoggedIn(handleUnfollow))
 	cmds.register("browse", middlewareLoggedIn(handleBrowse))
+	cmds.register("help", handleHelp)
 	argv := os.Args
 	if len(argv) < 2 {
 		fmt.Println("Not enough arguemnts provided.")

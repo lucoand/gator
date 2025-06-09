@@ -164,6 +164,11 @@ That's it!  You're now ready to use `gator`!
 `gator` has a variety of commands:
 
 ```console
+gator help
+```
+Displays a help message.
+
+```console
 gator reset
 ```
 After confirmation, this will DELETE all the data from the database and start over from scratch!  THIS CANNOT BE UNDONE so use with caution!
@@ -230,6 +235,8 @@ Example:
 gator agg 5m
 ```
 This is the main command of `gator`.  Fetches post data for feeds in the database.  Newly added feeds that haven't been fetched yet are prioritized, then the feed with the oldest `fetched_at` value.  This will cycle through all the feeds, one feed per `<interval>`.  Minimum interval is 1m (one minute).
+This is meant to be running in the background while you do other things.  Ctrl+C to quit out.
+
 
 ```console
 gator browse [limit]
