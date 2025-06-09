@@ -161,4 +161,83 @@ That's it!  You're now ready to use `gator`!
 
 ## Usage
 
+`gator` has a variety of commands:
 
+```console
+gator reset
+```
+After confirmation, this will DELETE all the data from the database and start over from scratch!  THIS CANNOT BE UNDONE so use with caution!
+
+```console
+gator register <username>
+```
+Example:
+```console
+gator register lucoa
+```
+Registers `<username>` as a user in the database, and logs the user in.
+
+```console
+gator login <username>
+```
+Logs in an existing user, allowing you to switch between multiple users.  Usage is the same as register.
+
+```console
+gator users
+```
+Lists all users registered in the database.  Marks the current logged in user as (current) in the output.
+```console
+gator addfeed <feedname> <url>
+```
+Example:
+```console
+gator addfeed "NY Times World News" "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+```
+Adds an RSS feed to the database and automatically follows it for the logged-in user.  If the feed is already in the database, you can instead use the next command to follow it.
+
+```console
+gator follow <url>
+```
+Example:
+```console
+gator register lucoa
+gator addfeed "NY Times World News" "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+gator register tohru
+gator follow "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+```
+Follows a feed that is already in the database.
+```console
+gator feeds
+```
+Lists all the feeds by name and url that are tracked in the database.
+```console
+gator unfollow <url>
+```
+Example:
+```console
+gator unfollow "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+```
+Unfollows the feed at `<url>` for the current logged in user.
+```console
+gator following
+```
+Lists all the feeds that are followed by the current logged in user.
+```console
+gator agg <interval>
+```
+Example:
+```console
+gator agg 5m
+```
+This is the main command of `gator`.  Fetches post data for feeds in the database.  Newly added feeds that haven't been fetched yet are prioritized, then the feed with the oldest `fetched_at` value.  This will cycle through all the feeds, one feed per `<interval>`.  Minimum interval is 1m (one minute).
+
+```
+gator browse [limit]
+```
+Limit argument is optional.  Defaults to 2.
+
+Example:
+```
+gator browse 5
+```
+Lists a number of posts from the currently logged in user's feeds, most recently published posts first.

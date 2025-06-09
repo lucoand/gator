@@ -380,7 +380,7 @@ func scrapeFeeds(s *state) error {
 			}
 
 		} else {
-			fmt.Printf("%v %v %v %v\n\n", post.Title, post.Url, post.Description, post.PublishedAt)
+			// fmt.Printf("%v %v %v %v\n\n", post.Title, post.Url, post.Description, post.PublishedAt)
 			fmt.Println("TITLE:", post.Title)
 			fmt.Println("URL:", post.Url)
 			fmt.Println("DESCRIPTION:", post.Description)
