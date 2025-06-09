@@ -231,13 +231,13 @@ gator agg 5m
 ```
 This is the main command of `gator`.  Fetches post data for feeds in the database.  Newly added feeds that haven't been fetched yet are prioritized, then the feed with the oldest `fetched_at` value.  This will cycle through all the feeds, one feed per `<interval>`.  Minimum interval is 1m (one minute).
 
-```
+```console
 gator browse [limit]
 ```
 Limit argument is optional.  Defaults to 2.
 
 Example:
-```
+```console
 gator browse 5
 ```
 Lists a number of posts from the currently logged in user's feeds, most recently published posts first.
